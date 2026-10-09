@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trim">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>Trim</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #16181d; --muted: #6b7280;
+    --line: #e3e5ea; --accent: #2563eb; --accent-soft: #dbe7ff;
+    --good: #15803d; --bad: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --card: #1a1d24; --text: #eef0f4; --muted: #9aa1ad;
+      --line: #2a2e38; --accent: #6b9bff; --accent-soft: #1f2c4a;
+      --good: #4ade80; --bad: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 20px 16px; }
+  h1 { font-size: 26px; margin: 4px 0 16px; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .stat .label { font-size: 12px; color: var(--muted); }
+  .stat .value { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .value small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .good { color: var(--good); } .bad { color: var(--bad); }
+  form.row { display: flex; gap: 8px; flex-wrap: wrap; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1 1 120px; min-width: 0; }
+  input, button, select {
+    font: inherit; color: inherit; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); padding: 10px 12px; min-width: 0; width: 100%;
+  }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { cursor: pointer; width: auto; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; flex: 1 1 100%; }
+  button.link { border: 0; background: none; color: var(--muted); padding: 4px 8px; }
+  button.link:hover { color: var(--bad); }
+  .range { display: flex; gap: 6px; margin-bottom: 8px; }
+  .range button { padding: 5px 11px; font-size: 13px; border-radius: 999px; }
+  .range button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--muted); font-size: 11px; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+  ul.list li:first-child { border-top: 0; }
+  .list .date { color: var(--muted); font-size: 14px; width: 92px; flex: none; }
+  .list .kg { font-weight: 600; font-variant-numeric: tabular-nums; width: 70px; flex: none; }
+  .list .note { flex: 1; color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empty { color: var(--muted); text-align: center; padding: 18px 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .hint { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
+    background: var(--card); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button { flex: 1; max-width: 160px; border: 0; background: none; padding: 12px 4px; font-size: 13px; color: var(--muted); border-radius: 0; }
+  nav button.on { color: var(--accent); font-weight: 700; }
+  nav .ico { display: block; font-size: 20px; }
+  section[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <!-- ============ VEKT ============ -->
+  <section id="tab-vekt">
+    <h1>Vekt</h1>
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <h2>Ny registrering</h2>
+      <form class="row" id="weight-form">
+        <label>Dato <input type="date" id="w-date" required></label>
+        <label>Vekt (kg) <input type="text" inputmode="decimal" id="w-kg" placeholder="82,5" required></label>
+        <label style="flex-basis:100%">Notat (valgfritt) <input type="text" id="w-note" maxlength="80"></label>
+        <button class="primary" type="submit">Lagre</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Utvikling</h2>
+      <div class="range" id="range"></div>
+      <div id="chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>Historikk</h2>
+      <ul class="list" id="weight-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============ INNSTILLINGER ============ -->
+  <section id="tab-mer" hidden>
+    <h1>Innstillinger</h1>
+    <div class="card">
+      <h2>Mål og plan</h2>
+      <form class="row" id="goal-form">
+        <label>Startvekt (kg) <input type="text" inputmode="decimal" id="start-kg" placeholder="Ikke satt"></label>
+        <label>Startdato <input type="date" id="start-date"></label>
+        <label>Målvekt (kg) <input type="text" inputmode="decimal" id="goal" placeholder="Ikke satt"></label>
+        <label>Måldato <input type="date" id="goal-date"></label>
+        <button class="primary" type="submit">Lagre mål</button>
+      </form>
+      <p class="hint">Fyll ut alle fire feltene for å få en plankurve i grafen og se om du ligger foran eller bak.</p>
+    </div>
+    <div class="card">
+      <h2>Sikkerhetskopi</h2>
+      <div class="actions">
+        <button id="export">Last ned kopi</button>
+        <button id="import">Gjenopprett fra kopi</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <p class="hint">All data ligger kun i denne nettleseren på denne enheten. Last ned en kopi av og til, så mister du ingenting om nettleserdata blir slettet.</p>
+    </div>
+  </section>
+</main>
+
+<nav id="nav">
+  <button data-tab="vekt"><span class="ico">⚖️</span>Vekt</button>
+  <button data-tab="mer"><span class="ico">⚙️</span>Mer</button>
+</nav>
+
+<script>
+// ---------- Lagring ----------
+// All data ligger i ett objekt.
+const STORAGE_KEY = 'min-helse-v1';
+const emptyState = () => ({ version: 1, weights: [], settings: { goal: null, startKg: null, startDate: null, goalDate: null } });
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? Object.assign(emptyState(), JSON.parse(raw)) : emptyState();
+  } catch { return emptyState(); }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+let state = load();
+let range = 90; // dager vist i grafen, 0 = alt
+
+// ---------- Hjelpere ----------
+const $ = id => document.getElementById(id);
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const parseKg = s => { const n = parseFloat(String(s).trim().replace(',', '.')); return n > 20 && n < 400 ? Math.round(n * 10) / 10 : null; };
+const fmt = n => n.toFixed(1).replace('.', ',');
+const fmtDate = iso => new Date(iso + 'T12:00').toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: '2-digit' });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sorted = () => [...state.weights].sort((a, b) => a.date.localeCompare(b.date));
+
+// ---------- Vekt ----------
+// Planen er en rett linje fra startvekt (startdato) til målvekt (måldato).
+function plan() {
+  const s = state.settings;
+  return s.goal && s.startKg && s.startDate && s.goalDate && s.goalDate > s.startDate ? s : null;
+}
+function planAt(ms) {
+  const p = plan(), a = Date.parse(p.startDate), b = Date.parse(p.goalDate);
+  const t = Math.min(b, Math.max(a, ms));
+  return p.startKg + (p.goal - p.startKg) * (t - a) / (b - a);
+}
+
+function renderStats() {
+  const w = sorted(), s = state.settings;
+  if (!w.length) { $('stats').innerHTML = ''; return; }
+  const last = w[w.length - 1];
+  const base = s.startKg || w[0].kg;
+  const diff = last.kg - base;
+  // Retningen mot målet avgjør hva som er bra: ned ved vektnedgang, opp ved vektoppgang.
+  const dir = s.goal ? Math.sign(s.goal - base) || -1 : -1;
+  const cls = Math.abs(diff) < 0.05 ? '' : diff * dir > 0 ? 'good' : 'bad';
+  const tile = (label, value, unit, c = '') =>
+    `<div class="stat"><div class="label">${label}</div><div class="value ${c}">${value} <small>${unit}</small></div></div>`;
+  let html = tile('Nå', fmt(last.kg), 'kg') + tile('Siden start', (diff > 0 ? '+' : '') + fmt(diff), 'kg', cls);
+  if (s.goal) html += tile('Til mål', fmt(Math.abs(last.kg - s.goal)), 'kg');
+  if (plan()) {
+    const off = last.kg - planAt(Date.parse(last.date));
+    const ahead = off * dir >= -0.05;
+    html += tile('Mot plan', fmt(Math.abs(off)), Math.abs(off) < 0.05 ? 'kg – i rute' : ahead ? 'kg foran' : 'kg bak', ahead ? 'good' : 'bad');
+  } else if (!s.goal) {
+    const week = w.slice(-7);
+    html += tile(`Snitt siste ${week.length}`, fmt(week.reduce((sum, e) => sum + e.kg, 0) / week.length), 'kg');
+  }
+  $('stats').innerHTML = html;
+}
+
+function renderRange() {
+  const opts = [[30, '30 d'], [90, '90 d'], [365, '1 år'], [0, 'Alt']];
+  $('range').innerHTML = opts.map(([d, l]) => `<button data-d="${d}" class="${d === range ? 'on' : ''}">${l}</button>`).join('');
+}
+
+function renderChart() {
+  let w = sorted();
+  const p = plan(), goal = state.settings.goal;
+  if (range) {
+    const from = new Date(); from.setDate(from.getDate() - range);
+    const iso = from.toISOString().slice(0, 10);
+    w = w.filter(e => e.date >= iso);
+  }
+  // «Alt» viser hele planen fram til måldato; de kortere periodene zoomer inn på målingene.
+  const times = w.map(e => Date.parse(e.date));
+  if (p && !range) times.push(Date.parse(p.startDate), Date.parse(p.goalDate));
+  const t0 = Math.min(...times), t1 = Math.max(...times);
+  if (!w.length || !(t1 > t0)) { $('chart').innerHTML = '<p class="empty">Registrer minst to målinger for å se grafen.</p>'; return; }
+
+  // Tegn i faktisk bredde så teksten er lesbar også på mobil.
+  const W = Math.max(280, Math.min(600, $('chart').clientWidth || 600)), H = 220, L = 40, R = 12, T = 12, B = 26;
+  const vals = w.map(e => e.kg);
+  if (p) vals.push(planAt(t0), planAt(t1)); else if (goal) vals.push(goal);
+  const min = Math.floor(Math.min(...vals) - 0.5), max = Math.ceil(Math.max(...vals) + 0.5);
+  const x = ms => L + (ms - t0) / (t1 - t0) * (W - L - R);
+  const y = k => T + (max - k) / (max - min) * (H - T - B);
+  const isoOf = ms => new Date(ms).toISOString().slice(0, 10);
+
+  const steps = 4;
+  let grid = '';
+  for (let i = 0; i <= steps; i++) {
+    const k = min + (max - min) * i / steps;
+    grid += `<line x1="${L}" x2="${W - R}" y1="${y(k)}" y2="${y(k)}" stroke="var(--line)"/>
+             <text x="${L - 6}" y="${y(k) + 4}" text-anchor="end">${fmt(k)}</text>`;
+  }
+
+  let target = '';
+  if (p) {
+    const a = Math.max(t0, Date.parse(p.startDate)), b = Math.min(t1, Date.parse(p.goalDate));
+    if (b > a) {
+      const atGoal = b === Date.parse(p.goalDate);
+      target = `<line x1="${x(a)}" y1="${y(planAt(a))}" x2="${x(b)}" y2="${y(planAt(b))}" stroke="var(--good)" stroke-width="2" stroke-dasharray="5 4"/>
+        <text x="${x(b)}" y="${y(planAt(b)) - 6}" text-anchor="end" style="fill:var(--good)">${atGoal ? 'Mål ' + fmt(p.goal) : 'Plan'}</text>`;
+    }
+  } else if (goal) {
+    target = `<line x1="${L}" x2="${W - R}" y1="${y(goal)}" y2="${y(goal)}" stroke="var(--good)" stroke-dasharray="5 4"/>
+      <text x="${W - R}" y="${y(goal) - 5}" text-anchor="end" style="fill:var(--good)">Mål ${fmt(goal)}</text>`;
+  }
+
+  const pts = w.map(e => `${x(Date.parse(e.date)).toFixed(1)},${y(e.kg).toFixed(1)}`).join(' ');
+  const dots = w.length <= 60 ? w.map(e => `<circle cx="${x(Date.parse(e.date))}" cy="${y(e.kg)}" r="3" fill="var(--accent)"><title>${fmtDate(e.date)}: ${fmt(e.kg)} kg</title></circle>`).join('') : '';
+
+  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vektutvikling">
+    ${grid}${target}
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text x="${L}" y="${H - 6}">${fmtDate(isoOf(t0))}</text>
+    <text x="${W - R}" y="${H - 6}" text-anchor="end">${fmtDate(isoOf(t1))}</text>
+  </svg>`;
+}
+
+function renderList() {
+  const w = sorted().reverse();
+  $('weight-list').innerHTML = w.length
+    ? w.map(e => `<li>
+        <span class="date">${fmtDate(e.date)}</span>
+        <span class="kg">${fmt(e.kg)} kg</span>
+        <span class="note">${esc(e.note || '')}</span>
+        <button class="link" data-del="${e.date}" aria-label="Slett ${fmtDate(e.date)}">Slett</button>
+      </li>`).join('')
+    : '<li class="empty">Ingen registreringer ennå.</li>';
+}
+
+function render() { renderStats(); renderRange(); renderChart(); renderList(); }
+
+$('weight-form').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const kg = parseKg($('w-kg').value), date = $('w-date').value;
+  if (!kg || !date) { $('w-kg').focus(); alert('Skriv inn en gyldig vekt, f.eks. 82,5'); return; }
+  // Én måling per dag: ny registrering samme dato erstatter den gamle.
+  state.weights = state.weights.filter(e => e.date !== date);
+  state.weights.push({ date, kg, note: $('w-note').value.trim() });
+  save();
+  $('w-kg').value = ''; $('w-note').value = '';
+  render();
+});
+
+$('weight-list').addEventListener('click', ev => {
+  const date = ev.target.dataset.del;
+  if (!date || !confirm(`Slette målingen fra ${fmtDate(date)}?`)) return;
+  state.weights = state.weights.filter(e => e.date !== date);
+  save(); render();
+});
+
+$('range').addEventListener('click', ev => {
+  if (ev.target.dataset.d === undefined) return;
+  range = Number(ev.target.dataset.d); renderRange(); renderChart();
+});
+
+// ---------- Innstillinger ----------
+$('goal-form').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const num = id => { const raw = $(id).value.trim(); return raw ? parseKg(raw) || NaN : null; };
+  const goal = num('goal'), startKg = num('start-kg');
+  const startDate = $('start-date').value || null, goalDate = $('goal-date').value || null;
+  if (Number.isNaN(goal) || Number.isNaN(startKg)) { alert('Skriv inn en gyldig vekt, f.eks. 78'); return; }
+  if (startDate && goalDate && goalDate <= startDate) { alert('Måldato må være etter startdato.'); return; }
+  Object.assign(state.settings, { goal, startKg, startDate, goalDate });
+  save(); render();
+  alert(plan() ? 'Plan lagret – se kurven under Vekt.' : 'Lagret. Fyll ut alle fire feltene for å få plankurve.');
+});
+
+$('export').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+  a.download = `trim-${today()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+$('import').addEventListener('click', () => $('import-file').click());
+$('import-file').addEventListener('change', async ev => {
+  const file = ev.target.files[0]; ev.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data.weights)) throw new Error();
+    if (!confirm(`Erstatte dagens data med kopien (${data.weights.length} vektmålinger)?`)) return;
+    state = Object.assign(emptyState(), data); save(); init();
+  } catch { alert('Kunne ikke lese filen. Er det en kopi fra denne appen?'); }
+});
+
+// ---------- Navigasjon ----------
+function showTab(name) {
+  document.querySelectorAll('main > section').forEach(s => s.hidden = s.id !== 'tab-' + name);
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+}
+$('nav').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) showTab(b.dataset.tab); });
+
+function init() {
+  $('w-date').value = today();
+  const s = state.settings, first = sorted()[0];
+  $('goal').value = s.goal ? fmt(s.goal) : '';
+  $('goal-date').value = s.goalDate || '';
+  // Forslag: første måling som start, til du har lagret noe annet.
+  $('start-kg').value = s.startKg ? fmt(s.startKg) : first ? fmt(first.kg) : '';
+  $('start-date').value = s.startDate || (first ? first.date : '');
+  render();
+}
+init(); showTab('vekt');
+addEventListener('resize', renderChart);
+
+// Frakoblet bruk + be nettleseren om ikke å rydde bort dataene.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+</script>
+</body>
+</html>
